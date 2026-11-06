@@ -21,6 +21,20 @@ The plan is to wire CTS\* to one of these pins with a flying lead. One ROM then
 answers reads at $C000–$DFFF as well, so HDB-DOS runs from the motherboard
 socket with nothing in the cartridge slot.
 
+This works on a 26-3134. Disk Extended BASIC 1.1 boots from X1 with no cartridge
+fitted; the config is `configs/coco2-27128-disk11.json`.
+
+Two things about this board shape every config:
+
+- **OE (pin 22) is tied active.** Both chips must mark `oe` as `ignore`, so CE
+  (pin 20) alone selects BASIC and CTS\* alone selects the X1 chip. Chip 0 also
+  needs `allow_cs_ignore`. With OE left in, One ROM treats it as a chip select
+  that is always active, drives the data bus on every cycle, and the CoCo
+  doesn't boot.
+- **The slot's table is 512KB, so there is only one RAM slot.** The menu can't
+  load an entry into a second RAM slot and switch to it. Instead the plugin
+  copies the entry over the live slot while the CoCo runs from its own RAM.
+
 On the two-socket boards, the Extended BASIC socket's chip select takes the
 other X pin. That gives three images in one slot: BASIC, Extended BASIC and
 HDB-DOS. Three is the most a multi-ROM slot holds.
@@ -38,6 +52,22 @@ time later.
 | 4 | Entry 3 + HDB-DOS | |
 | 5 | Diagnostics | Based on varmfskii/cocodiag, which needs work. |
 | 6 | Forth | hcgernhardtiii/coco-forth-rom |
+
+## Booting and RESET
+
+The CoCo fetches its reset vector from $FFFE, which the SAM maps to $BFFE, the
+top of the motherboard socket. So the boot slot's chip 0 is the grub image: menu
+code at $8000-$BFFF with its own reset vector. Choosing an entry copies that
+entry's image over the live slot and jumps through its reset vector.
+
+- **Power-on goes to grub.** One ROM is powered from the socket, so a power
+  cycle restarts it into the grub slot.
+- **RESET stays in the chosen system,** as it would with a real ROM. Many games
+  need RESET pressed to get artifact colours right, and BASIC's warm start
+  relies on it too.
+- **To do:** holding a key through RESET returns to grub. One ROM doesn't see the
+  RESET line, so this needs the plugin to watch for the reset vector fetch, or
+  RESET wired to a spare pin.
 
 ## DriveWire plugin
 
