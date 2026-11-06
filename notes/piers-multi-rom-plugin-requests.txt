@@ -1,6 +1,6 @@
-Hi Piers. I'm building a CoCo boot menu on One ROM: a user plugin (the DriveWire one, extended) plus a menu ROM, on a fire-28-c multi-ROM slot. BASIC/ECB is a 27128 in the motherboard socket, and HDB-DOS is a 2764 on X1, wired to the cart select (CTS*), so no cartridge is needed. Slot switching for the menu works on 0.8.0 as is.
+Hi Piers. I'm building a CoCo boot menu on One ROM: a user plugin (the DriveWire one, extended) plus a menu ROM, on a fire-28-c multi-ROM slot. BASIC/ECB is a 27128 in the motherboard socket, and HDB-DOS is a 2764 on X1, wired to the cart select (CTS*), so no cartridge is needed.
 
-First, a bug I think you'll want regardless: REPROGRAM_RAM_ROM_SLOT writes one table entry per byte, with only chip 0's primary select set. A multi slot's commoned OE sits in the window too, and a real read has it active, so a plugin's write to a multi slot is never served. The emulator shows it on 28-multi-27xxx.
+First, a bug I think you'll want regardless: REPROGRAM_RAM_ROM_SLOT writes one table entry per byte, with only chip 0's primary select set. A multi slot's commoned OE sits in the window too, and a real read has it active, so a plugin's write to a multi slot is never served. The emulator shows it on 28-multi-27xxx. A second one: a checked DEMANGLE_ADDR on a multi slot logs an ERR for every forced pin in the window (VPP on a 27128). The ERR is formatted on the caller's stack, so it overflows a user plugin's stack.
 
 What a plugin needs for this, all carried as a local patch on v0.8.0 with plugin API tests:
 
@@ -10,6 +10,8 @@ What a plugin needs for this, all carried as a local patch on v0.8.0 with plugin
 
 3) An address monitor that captures every chip's reads. Today it watches chip 0's select only, so DriveWire can't see HDB-DOS reads on X1.
 
-4) Reprogram writes that go to every entry a read can reach. That means all combinations of the bits that are don't-care for that chip: gaps such as VPP on a 27128, the address lines a smaller chip lacks, and commoned lines. It replaces my gap-mask fix and also fixes the bug above.
+4) Copying one chip of a flash slot into one chip of a RAM slot, so menu entries can be stored as 32KB single slots rather than 512KB multi slots.
+
+5) Reprogram writes that go to every entry a read can reach. That means all combinations of the bits that are don't-care for that chip: gaps such as VPP on a 27128, the address lines a smaller chip lacks, and commoned lines. It replaces my gap-mask fix and also fixes the bug above.
 
 The local IDs are numbered from 0x10000 so they can't collide with yours. Happy to send patches or open issues, whichever you prefer, and I'll match whatever API shape you'd rather have.

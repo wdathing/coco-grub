@@ -74,6 +74,28 @@ entry's image over the live slot and jumps through its reset vector.
 The aim is a single build of the One ROM DriveWire plugin that works whether
 HDB-DOS sits in the cartridge slot or in the motherboard socket.
 
+## Building
+
+`menu.json` lists the menu's entries. `build.py` turns it into a One ROM
+firmware image:
+
+    ./build.py --onerom <onerom CLI> --base-firmware <onerom-rp235x.bin> \
+               --plugin <drivewire_plugin.bin>
+
+The base firmware and plugin come from the `rebase-v0.8.0` branch of the
+one-rom fork. The firmware needs that fork's local plugin API extensions, and
+the CLI must be new enough to read v0.8.0 firmware. The result goes to
+`build/coco-grub.bin`, with the One ROM config beside it in `build/onerom.json`.
+`--debug-halt` stops the menu straight after it signals the plugin, so One ROM's
+capture ring still holds the signal.
+
+Each ROM gets a small single-chip flash slot, and the plugin copies an entry's
+ROMs into the live slot when it's chosen. See `build.py` for the layout and
+`src/grub.asm` for how the menu signals the plugin.
+
+**Status (2026-11-06):** both milestone 1 entries load on a 26-3134, plain
+BASIC and Disk Extended BASIC on CTS\*.
+
 ## ROM images
 
 Tandy and Microsoft ROM images are not stored in this repository. The build

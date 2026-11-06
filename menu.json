@@ -1,0 +1,14 @@
+{
+    "board": "fire-28-c",
+    "entries": [
+        {
+            "name": "Color BASIC + Extended",
+            "socket": "roms/coco2rom-from-FF70.bin"
+        },
+        {
+            "name": "Disk Extended BASIC 1.1",
+            "socket": "roms/coco2rom-from-FF70.bin",
+            "cartridge": "roms/disk11.rom"
+        }
+    ]
+}
