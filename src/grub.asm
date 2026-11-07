@@ -22,12 +22,16 @@
 * With the plugin running, nothing answers the cartridge select while the
 * menu does - the plugin disables X1 at startup - so whatever is read at
 * $C000 is a cartridge in the slot.  Entries that would put a ROM on the
-* cartridge select are then shown and refused.
+* cartridge select are then shown and refused, as are entries needing 64K on
+* a smaller machine.  A status line under the title gives the RAM size and
+* the CPU found.
 
 SCREEN  equ     $0400
 PIA0    equ     $FF00
 PIA1    equ     $FF20
 SAMREG  equ     $FFC0
+SAMTY0  equ     $FFDE           SAM map type 0: ROM at $8000-$FEFF
+SAMTY1  equ     $FFDF           SAM map type 1: all RAM
 RSTFLG  equ     $71             Color BASIC's warm start flag - $55 means warm
 CARTROM equ     $C000
 
@@ -36,9 +40,17 @@ STUB    equ     $3000           the loader stub runs here
 KBUF    equ     $3100           knock and payload, 12 bytes
 VEC     equ     $310C           the chosen entry's reset vector
 CARTIN  equ     $310E           non-zero when a cartridge is fitted
+EXEC    equ     $3110           the chosen entry's start address
+RAMK    equ     $3112           RAM size in K: 16, 32 or 64
+CPU63   equ     $3113           non-zero on a 6309
+PROBE   equ     $3200           RAMPROB's test byte, and its aliases above
 STACK   equ     $3F00
 
-RECLEN  equ     5+NAMELEN       menu.inc's record: slots, flags, vector, name
+* menu.inc's record: slots, flags, reset vector, start address, name
+RECLEN  equ     7+NAMELEN
+RNAME   equ     7
+FLGCTS  equ     $01             puts a ROM on the cartridge select
+FLG64K  equ     $02             needs 64K
 
         org     $8000
 
@@ -84,12 +96,27 @@ SAMCLR  sta     ,u++
 RAM64   sta     -3,u
 RAMSET
 
+* RAMPROB switches the ROM out, so it runs from RAM.  The stub later
+* replaces it there.
+        ldx     #RAMSRC
+        ldu     #STUB
+CPRAM   lda     ,x+
+        sta     ,u+
+        cmpx    #RAMEND
+        bne     CPRAM
+        jsr     STUB
+        sta     RAMK
+        lbsr    CPUCHK
+
         lbsr    CLS
         ldx     #TITLE
         ldy     #SCREEN
         lbsr    PRINT
+        ldx     #VERSION
+        lbsr    PRINT
+        lbsr    STATUS
         ldx     #RULE
-        ldy     #SCREEN+32
+        ldy     #SCREEN+2*32
         lbsr    PRINT
 
 * Give the plugin time to start and disable X1 before looking for a
@@ -99,21 +126,18 @@ WAITPL  leax    -1,x
         bne     WAITPL
         lbsr    CARTCHK
 
-* The entries, one a row from row 3.
+* The entries, one a row from row 4.
         ldx     #ENTRIES
-        ldy     #SCREEN+3*32+1
+        ldy     #SCREEN+4*32+1
         ldb     #'1
 DRAWLP  pshs    b,x,y
-        lda     2,x             flags
-        anda    #$01
+        lbsr    REFUSE
         beq     DRAWNUM
-        tst     CARTIN
-        beq     DRAWNUM
-        lda     #'-             refused while a cartridge is fitted
+        lda     #'-             refused on this machine
         bra     DRAWKEY
 DRAWNUM tfr     b,a
 DRAWKEY lbsr    PUTC
-        leax    5,x
+        leax    RNAME,x
         leay    2,y
         lbsr    PRINTN
         puls    b,x,y
@@ -137,10 +161,7 @@ KEYWAIT ldb     #1
         ldx     #ENTRIES
 KEYLP   lbsr    KEYDOWN
         beq     KEYNEXT
-        lda     2,x
-        anda    #$01
-        beq     CHOSEN
-        tst     CARTIN
+        lbsr    REFUSE
         beq     CHOSEN
 KEYNEXT leax    RECLEN,x
         incb
@@ -167,6 +188,8 @@ CPKNOCK lda     ,y+
         sta     ,u+
         ldd     3,x
         std     VEC
+        ldd     5,x
+        std     EXEC
 
         ldx     #STUBSRC
         ldu     #STUB
@@ -194,8 +217,9 @@ SDEBUG  sync
         bra     SDEBUG
         ENDC
 
-* The plugin copies the entry's socket ROM in ascending order, so its reset
-* vector lands last.  Seeing it twice running means the entry is in place.
+* The plugin copies the cartridge select's ROM first, then the socket ROM in
+* ascending order, so the socket ROM's reset vector lands last.  Seeing it
+* twice running means the whole entry is in place.
 * About two seconds before giving up; the copy takes a fraction of that.
         ldy     #0
 SPOLL   ldd     $BFFE
@@ -214,11 +238,90 @@ SFAILLP lda     ,x+
         bra     SFAILLP
 SHALT   bra     SHALT
 SGO     clr     RSTFLG          a cold start, as at power-on
-        jmp     [$FFFE]
+        jmp     [EXEC]
 * Screen codes already: the stub can't call this ROM's PRINT.
 SFAIL   fcb     $4C,$4F,$41,$44,$60,$46,$41,$49,$4C,$45,$44,$60,$6D,$60
         fcb     $50,$4F,$57,$45,$52,$60,$43,$59,$43,$4C,$45,$00
 STUBEND
+
+* Returns A = the RAM size in K: 16, 32 or 64.  Copied to STUB and run from
+* there, as it switches the ROM out.  The SAM is already set for the RAM
+* chips, as Color BASIC sets it, so on 16K chips PROBE+$4000 is PROBE
+* again, and the upper 32K exists only where all-RAM mode finds RAM there
+* that isn't the lower 32K again.
+RAMSRC  ldx     #PROBE
+        clr     ,x
+        lda     #$5A
+        sta     $4000,x
+        tst     ,x
+        bne     RAM16
+        cmpa    $4000,x
+        bne     RAM16
+        sta     SAMTY1
+        coma
+        sta     $8000,x
+        cmpa    $8000,x
+        bne     RAM32
+        tst     ,x
+        bne     RAM32
+        lda     $4000,x
+        cmpa    #$5A
+        bne     RAM32
+        lda     #64
+        bra     RAMQ
+RAM32   lda     #32
+        bra     RAMQ
+RAM16   lda     #16
+RAMQ    sta     SAMTY0
+        rts
+RAMEND
+
+* Sets CPU63 on a 6309.  CLRD clears D on a 6309; a 6809 ignores the $10
+* page prefix on an opcode page 2 doesn't have, and runs CLRA, leaving B.
+CPUCHK  clr     CPU63
+        ldd     #$FFFF
+        fcb     $10,$4F         CLRD
+        tstb
+        bne     CPUQ
+        inc     CPU63
+CPUQ    rts
+
+* Prints the status line, row 1: the RAM size and the CPU.
+STATUS  ldy     #SCREEN+32
+        ldx     #RAMMSG
+        lbsr    PRINT
+        ldx     #K16
+        lda     RAMK
+        cmpa    #16
+        beq     STRAM
+        ldx     #K32
+        cmpa    #32
+        beq     STRAM
+        ldx     #K64
+STRAM   lbsr    PRINT
+        ldx     #CPUMSG
+        lbsr    PRINT
+        ldx     #C6809
+        tst     CPU63
+        beq     STCPU
+        ldx     #C6309
+STCPU   lbra    PRINT
+
+* X = a record.  Returns NE if the entry can't run on this machine: it
+* needs the cartridge select and a cartridge is fitted, or it needs 64K.
+* Keeps B, X and Y.
+REFUSE  lda     2,x
+        bita    #FLGCTS
+        beq     REF64
+        tst     CARTIN
+        bne     REFQ
+REF64   bita    #FLG64K
+        beq     REFOK
+        lda     RAMK
+        cmpa    #64
+        bne     REFQ
+REFOK   clra
+REFQ    rts
 
 * Sets CARTIN if a cartridge answers the cartridge select.  An empty bus
 * gives back the last byte driven onto it.  Each read below follows a dead
@@ -304,7 +407,21 @@ PRNLP   lda     ,x+
         rts
 
 KNOCK   fcc     "!GRUBGO!"
-TITLE   fcc     "COCO-GRUB"
+TITLE   fcc     "COCO-GRUB V"
+        fcb     0
+RAMMSG  fcc     "RAM: "
+        fcb     0
+K16     fcc     "16K"
+        fcb     0
+K32     fcc     "32K"
+        fcb     0
+K64     fcc     "64K"
+        fcb     0
+CPUMSG  fcc     "   CPU: "
+        fcb     0
+C6809   fcc     "6809"
+        fcb     0
+C6309   fcc     "6309"
         fcb     0
 RULE    fcc     "PICK A ROM SET:"
         fcb     0

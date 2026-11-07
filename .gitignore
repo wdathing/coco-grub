@@ -2,3 +2,4 @@
 /roms/
 *.rom
 *.bin
+/third_party/

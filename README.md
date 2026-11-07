@@ -35,6 +35,9 @@ Two things about this board shape every config:
   load an entry into a second RAM slot and switch to it. Instead the plugin
   copies the entry over the live slot while the CoCo runs from its own RAM.
 
+CTS\* selects all of $C000–$FEFF, so the X1 chip is a 27128. An 8K cartridge
+ROM is stored twice over in its 16K, as a real 2764 appears in that window.
+
 On the two-socket boards, the Extended BASIC socket's chip select takes the
 other X pin. That gives three images in one slot: BASIC, Extended BASIC and
 HDB-DOS. Three is the most a multi-ROM slot holds.
@@ -48,10 +51,17 @@ time later.
 | --- | --- | --- |
 | 1 | Color BASIC + ECB + HDB-DOS (One ROM build) | The default. |
 | 2 | Color BASIC + ECB | No HDB-DOS. The DriveWire plugin ignores knocks, and One ROM doesn't answer CTS\*. |
-| 3 | CoCo 3 BASIC, CoCo 2 port | ROMs from the Color Computer Archive. |
-| 4 | Entry 3 + HDB-DOS | |
-| 5 | Diagnostics | Based on varmfskii/cocodiag, which needs work. |
-| 6 | Forth | hcgernhardtiii/coco-forth-rom |
+| 3 | CoCo 3 BASIC, CoCo 2 port | Coco 32, from the Color Computer Archive. Needs 64K, and its patch code fills the cartridge select. |
+| 4 | Entry 3 + HDB-DOS | Clashes with entry 3's patch code on the cartridge select. |
+| 5 | Diagnostics | varmfskii/cocodiag, a cartridge started at $C000, as One ROM can't autostart it. |
+| 6 | Forth | hcgernhardtiii/coco-forth-rom, replacing Color BASIC. Built with asm6809. |
+
+The menu shows its version at the top left, and a status line under it with
+the RAM size and whether the CPU is a 6809 or a 6309. An entry the machine
+can't run - one needing 64K on a smaller machine, or the cartridge select with
+a cartridge fitted - shows `-` in place of its number.
+
+**To do:** a timer that boots a configurable entry if no key is pressed.
 
 ## Booting and RESET
 
@@ -76,9 +86,11 @@ HDB-DOS sits in the cartridge slot or in the motherboard socket.
 
 ## Building
 
-`menu.json` lists the menu's entries. `build.py` turns it into a One ROM
-firmware image:
+`menu.json` lists the menu's entries. `fetch.py` fetches and builds the
+third-party ROMs it names into `roms/`, each pinned to a commit or a SHA-256,
+and `build.py` turns it into a One ROM firmware image:
 
+    ./fetch.py
     ./build.py --onerom <onerom CLI> --base-firmware <onerom-rp235x.bin> \
                --plugin <drivewire_plugin.bin>
 
@@ -94,10 +106,11 @@ ROMs into the live slot when it's chosen. See `build.py` for the layout and
 `src/grub.asm` for how the menu signals the plugin.
 
 **Status (2026-11-06):** both milestone 1 entries load on a 26-3134, plain
-BASIC and Disk Extended BASIC on CTS\*.
+BASIC and Disk Extended BASIC on CTS\*. Coco 32, the diagnostics and
+Forth are in the menu, untested on hardware.
 
 ## ROM images
 
-Tandy and Microsoft ROM images are not stored in this repository. The build
-fetches them, or takes them from a local directory. Before anything from the
-two third-party projects is vendored, check their licences.
+No ROM images are stored in this repository. The Tandy ROMs come from a local
+dump in `roms/`. `fetch.py` fetches the rest: cocodiag is GPL-3.0, and
+coco-forth-rom has no licence, so neither can be vendored as things stand.
