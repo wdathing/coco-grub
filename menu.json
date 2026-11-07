@@ -2,6 +2,19 @@
     "board": "fire-28-c",
     "entries": [
         {
+            "name": "HDB-DOS (Becker, FujiNet)",
+            "socket": "roms/coco2rom-from-FF70.bin",
+            "cartridge": "roms/hdbdw3bck.rom",
+            "becker": true
+        },
+        {
+            "name": "Becker link test",
+            "socket": "roms/coco2rom-from-FF70.bin",
+            "cartridge": "build/becktest.rom",
+            "start": "C000",
+            "becker": true
+        },
+        {
             "name": "Color BASIC + Extended",
             "socket": "roms/coco2rom-from-FF70.bin"
         },
