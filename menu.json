@@ -15,6 +15,13 @@
             "becker": true
         },
         {
+            "name": "FujiNet SSID link test",
+            "socket": "roms/coco2rom-from-FF70.bin",
+            "cartridge": "build/ssidtest.rom",
+            "start": "C000",
+            "becker": true
+        },
+        {
             "name": "Color BASIC + Extended",
             "socket": "roms/coco2rom-from-FF70.bin"
         },
@@ -22,6 +29,11 @@
             "name": "Disk Extended BASIC 1.1",
             "socket": "roms/coco2rom-from-FF70.bin",
             "cartridge": "roms/disk11.rom"
+        },
+        {
+            "name": "Advanced BASIC (Deluxe)",
+            "socket": "roms/deluxe-socket.rom",
+            "cartridge": "roms/deluxe-cart.rom"
         },
         {
             "name": "CoCo 3 BASIC (Coco 32)",
