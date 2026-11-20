@@ -57,7 +57,7 @@ ROOT = Path(__file__).resolve().parent
 BUILD = ROOT / "build"
 
 # Shown at the top left of the menu.
-VERSION = "0.2"
+VERSION = "0.3"
 
 SOCKET_SIZE = 16384
 # CTS* selects all of $C000-$FEFF, so X1's chip is a 27128.  An 8K cartridge
