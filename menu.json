@@ -1,24 +1,10 @@
 {
-    "board": "fire-28-c",
+    "board": "fire-28-d",
     "entries": [
         {
             "name": "HDB-DOS (Becker, FujiNet)",
             "socket": "roms/coco2rom-from-FF70.bin",
             "cartridge": "roms/hdbdw3bck.rom",
-            "becker": true
-        },
-        {
-            "name": "Becker link test",
-            "socket": "roms/coco2rom-from-FF70.bin",
-            "cartridge": "build/becktest.rom",
-            "start": "C000",
-            "becker": true
-        },
-        {
-            "name": "FujiNet SSID link test",
-            "socket": "roms/coco2rom-from-FF70.bin",
-            "cartridge": "build/ssidtest.rom",
-            "start": "C000",
             "becker": true
         },
         {
@@ -42,14 +28,48 @@
             "needs_64k": true
         },
         {
-            "name": "Diagnostics (cocodiag)",
-            "socket": "roms/coco2rom-from-FF70.bin",
-            "cartridge": "roms/cocodiag.rom",
-            "start": "C000"
-        },
-        {
             "name": "Forth (coco-forth-rom)",
             "socket": "roms/forth.rom"
+        },
+        {
+            "name": "Diagnostics and tests",
+            "submenu": [
+                {
+                    "name": "Diagnostics (cocodiag)",
+                    "socket": "roms/coco2rom-from-FF70.bin",
+                    "cartridge": "roms/cocodiag.rom",
+                    "start": "C000"
+                },
+                {
+                    "name": "Becker link test",
+                    "socket": "roms/coco2rom-from-FF70.bin",
+                    "cartridge": "build/becktest.rom",
+                    "start": "C000",
+                    "becker": true
+                },
+                {
+                    "name": "FujiNet SSID link test",
+                    "socket": "roms/coco2rom-from-FF70.bin",
+                    "cartridge": "build/ssidtest.rom",
+                    "start": "C000",
+                    "becker": true
+                }
+            ]
+        },
+        {
+            "name": "Dragon",
+            "submenu": [
+                {
+                    "name": "Dragon 32 BASIC",
+                    "socket": "roms/dragon32-coco.rom"
+                },
+                {
+                    "name": "DOSplus 5 (FujiNet)",
+                    "socket": "roms/dragon32-coco.rom",
+                    "cartridge": "roms/dosplus5-becker.rom",
+                    "becker": "dragon"
+                }
+            ]
         }
     ]
 }

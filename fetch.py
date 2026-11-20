@@ -6,9 +6,10 @@
 """Fetch and build the third-party ROMs menu.json names, into roms/.
 
 None of these are stored in this repository: cocodiag is GPL-3.0,
-coco-forth-rom carries no licence, and Coco 32 is a modified Tandy ROM.  Each
-is pinned - a git commit, or a SHA-256 for a download - so a build is
-reproducible, and moving to a newer one is a deliberate edit here.
+coco-forth-rom carries no licence, and Coco 32 and the Dragon 32's BASIC are
+modified Tandy and Dragon Data ROMs.  Each is pinned - a git commit, or a
+SHA-256 for a download - so a build is reproducible, and moving to a newer
+one is a deliberate edit here.
 
 - roms/coco32.rom, roms/coco32-cart.rom: Coco 32, the CoCo 3's BASIC modified
   for a 64K CoCo 2, from the Color Computer Archive's EPROM files.  Its 8000
@@ -20,9 +21,15 @@ reproducible, and moving to a newer one is a deliberate edit here.
 - roms/forth.rom: hcgernhardtiii/coco-forth-rom, an 8K Forth replacing Color
   BASIC at $A000, built with asm6809 and laid out in the socket as its
   Makefile's "burnable" target does: 8K of zeros at $8000, then the Forth.
+- roms/dragon32-coco.rom: the Dragon 32's 16K BASIC ROM, from the Color
+  Computer Archive's XRoar ROMs, with patches/dragon32.asm laid over it so it
+  runs on a CoCo 2.  The pinned SHA-256 is what keeps the patches' addresses
+  pointing at the instructions they replace.
 
 The Tandy ROMs, roms/coco2rom-from-FF70.bin and roms/disk11.rom, come from a
-ROM dump and aren't fetched.
+ROM dump and aren't fetched.  Nor is roms/dosplus5-becker.rom: DOSplus 5 with
+the DW42 extender's Becker driver, build/DP50PSR-BCK.rom from
+dragon_dosplus5_extender's "./build.py becker".
 """
 
 import argparse
@@ -52,6 +59,10 @@ COCODIAG_COMMIT = "6bd3fce3c3c7771cffff7b62ab6cd1da37895d38"  # v1.2
 
 FORTH_REPO = "https://github.com/hcgernhardtiii/coco-forth-rom.git"
 FORTH_COMMIT = "95d62db812360d98ec3fbc67fe523fa7ca55ee77"
+
+DRAGON32_URL = "https://colorcomputerarchive.com/repo/ROMs/XRoar/Dragon/BASIC_OS/d32.rom"
+DRAGON32_SHA256 = "fc0e900bfec6b52f0f80ba1e65a4712808d2a411b5b00496639ef1a2152351f1"
+DRAGON32_BASE = 0x8000
 
 ROM_8K = 8192
 ROM_16K = 16384
@@ -119,7 +130,38 @@ def forth():
     (ROMS / "forth.rom").write_bytes(bytes(ROM_8K) + data)
 
 
-SOURCES = {"coco32": coco32, "cocodiag": cocodiag, "forth": forth}
+def decb_blocks(data):
+    """The (address, bytes) blocks of a DECB binary, lwasm's --format=decb."""
+    blocks = []
+    i = 0
+    while data[i] == 0x00:
+        length = int.from_bytes(data[i + 1:i + 3], "big")
+        address = int.from_bytes(data[i + 3:i + 5], "big")
+        blocks.append((address, data[i + 5:i + 5 + length]))
+        i += 5 + length
+    if data[i] != 0xFF:
+        fail(f"DECB binary has a block type ${data[i]:02X} at offset {i}")
+    return blocks
+
+
+def dragon32():
+    with urllib.request.urlopen(DRAGON32_URL) as response:
+        rom = bytearray(response.read())
+    if hashlib.sha256(rom).hexdigest() != DRAGON32_SHA256:
+        fail("the Dragon 32's d32.rom doesn't match its pinned SHA-256")
+    patch = ROMS / "dragon32-patch.bin"
+    subprocess.run(["lwasm", "--format=decb", f"-o{patch}", str(ROOT / "patches" / "dragon32.asm")],
+                   check=True)
+    for address, block in decb_blocks(patch.read_bytes()):
+        offset = address - DRAGON32_BASE
+        if not 0 <= offset <= len(rom) - len(block):
+            fail(f"a Dragon 32 patch at ${address:04X} lands outside the ROM")
+        rom[offset:offset + len(block)] = block
+    patch.unlink()
+    (ROMS / "dragon32-coco.rom").write_bytes(sized(bytes(rom), ROM_16K, "the patched Dragon 32 ROM"))
+
+
+SOURCES = {"coco32": coco32, "cocodiag": cocodiag, "forth": forth, "dragon32": dragon32}
 
 
 def main():

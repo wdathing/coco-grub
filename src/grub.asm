@@ -5,12 +5,14 @@
 * coco-grub: the boot menu One ROM serves from the CoCo's motherboard ROM
 * socket ($8000-$BFFF) at power-on.
 *
-* It sets the machine up as Color BASIC's reset would, shows the entries
-* build.py generated into menu.inc, and waits for a key 1-9.  Choosing an
-* entry hands over to a stub in RAM, which knocks "!GRUBGO!" and the entry's
-* four payload bytes to One ROM's plugin (plugins/user/drivewire,
-* drivewire_do_grub()), then polls the reset vector until the plugin has
-* copied the entry's ROMs over this one, and cold-starts it.
+* It sets the machine up as Color BASIC's reset would, shows the menus
+* build.py generated into menu.inc, and waits for a key 1-9.  An entry can
+* be a submenu, one level deep, which BREAK leaves for the top menu again.
+* Choosing any other entry hands over to a stub in RAM, which knocks
+* "!GRUBGO!" and the entry's four payload bytes to One ROM's plugin
+* (plugins/user/drivewire, drivewire_grub_payload()), then polls the reset
+* vector until the plugin has copied the entry's ROMs over this one, and
+* cold-starts it.
 *
 * Signalling: byte b is sent as a read of SIGPAGE+b, a page of this ROM
 * nothing else reads.  One ROM captures every cycle the socket is selected,
@@ -43,14 +45,20 @@ CARTIN  equ     $310E           non-zero when a cartridge is fitted
 EXEC    equ     $3110           the chosen entry's start address
 RAMK    equ     $3112           RAM size in K: 16, 32 or 64
 CPU63   equ     $3113           non-zero on a 6309
+MENUP   equ     $3114           the menu shown
+MENUN   equ     $3116           its entry count
 PROBE   equ     $3200           RAMPROB's test byte, and its aliases above
 STACK   equ     $3F00
 
-* menu.inc's record: slots, flags, reset vector, start address, name
+* menu.inc's menu: its entry count, its title, then a record per entry
+MRECS   equ     3
+* menu.inc's record: slots, flags, reset vector, start address, name.  A
+* submenu's has its menu in place of the reset vector.
 RECLEN  equ     7+NAMELEN
 RNAME   equ     7
 FLGCTS  equ     $01             puts a ROM on the cartridge select
 FLG64K  equ     $02             needs 64K
+FLGSUB  equ     $80             a submenu: the menu alone reads it
 
         org     $8000
 
@@ -115,9 +123,6 @@ CPRAM   lda     ,x+
         ldx     #VERSION
         lbsr    PRINT
         lbsr    STATUS
-        ldx     #RULE
-        ldy     #SCREEN+2*32
-        lbsr    PRINT
 
 * Give the plugin time to start and disable X1 before looking for a
 * cartridge: a few hundred milliseconds.
@@ -126,8 +131,23 @@ WAITPL  leax    -1,x
         bne     WAITPL
         lbsr    CARTCHK
 
+        ldx     #MENU0
+
+* X = a menu.  Shows it and waits for a key: a number that picks one of its
+* entries, or BREAK in a submenu.
+SHOWMNU stx     MENUP
+        lda     ,x
+        sta     MENUN
+        lbsr    KEYUP           the key that chose this menu isn't a choice in it
+        lbsr    CLRMENU
+        ldx     MENUP
+        ldx     1,x             the title
+        ldy     #SCREEN+2*32
+        lbsr    PRINT
+
 * The entries, one a row from row 4.
-        ldx     #ENTRIES
+        ldx     MENUP
+        leax    MRECS,x
         ldy     #SCREEN+4*32+1
         ldb     #'1
 DRAWLP  pshs    b,x,y
@@ -140,11 +160,20 @@ DRAWKEY lbsr    PUTC
         leax    RNAME,x
         leay    2,y
         lbsr    PRINTN
-        puls    b,x,y
+        ldx     1,s
+        lda     2,x
+        bpl     DRAWNXT
+        ldy     3,s             a submenu: marked at the end of its row
+        leay    29,y
+        lda     #'>
+        lbsr    PUTC
+DRAWNXT puls    b,x,y
         leax    RECLEN,x
         leay    32,y
         incb
-        cmpb    #'1+NENTRY
+        tfr     b,a
+        suba    #'1
+        cmpa    MENUN
         bne     DRAWLP
 
         tst     CARTIN
@@ -153,21 +182,36 @@ DRAWKEY lbsr    PUTC
         ldy     #SCREEN+13*32
         lbsr    PRINT
 PROMPT  ldx     #PRESS
-        ldy     #SCREEN+15*32
+        ldy     MENUP
+        cmpy    #MENU0
+        beq     PROMPT1
+        ldx     #PRESSUB
+PROMPT1 ldy     #SCREEN+15*32
         lbsr    PRINT
 
 * Wait for a key that picks an entry.
 KEYWAIT ldb     #1
-        ldx     #ENTRIES
+        ldx     MENUP
+        leax    MRECS,x
 KEYLP   lbsr    KEYDOWN
         beq     KEYNEXT
         lbsr    REFUSE
-        beq     CHOSEN
+        beq     PICKED
 KEYNEXT leax    RECLEN,x
         incb
-        cmpb    #NENTRY+1
-        bne     KEYLP
-        bra     KEYWAIT
+        cmpb    MENUN
+        bls     KEYLP
+        ldx     MENUP
+        cmpx    #MENU0
+        beq     KEYWAIT
+        lbsr    BRKDOWN
+        beq     KEYWAIT
+        ldx     #MENU0          BREAK: back to the top
+        lbra    SHOWMNU
+PICKED  lda     2,x
+        bpl     CHOSEN
+        ldx     3,x             a submenu: show it
+        lbra    SHOWMNU
 
 * X = the chosen record.  Build the knock and payload, then the stub.
 CHOSEN  ldu     #KBUF
@@ -184,7 +228,7 @@ CPKNOCK lda     ,y+
         stb     ,u+
         ldb     2,x             flags
         stb     ,u+
-        eora    #$5A            check byte, as drivewire_do_grub() wants
+        eora    #$5A            check byte, as drivewire_grub_payload() wants
         sta     ,u+
         ldd     3,x
         std     VEC
@@ -370,6 +414,39 @@ KEYCOL  ldx     #COLTBL
 
 COLTBL  fcb     $FE,$FD,$FB,$F7,$EF,$DF,$BF,$7F
 
+* Returns NE if BREAK is down: row 6 of the matrix, column 2.
+BRKDOWN lda     #$FB
+        sta     PIA0+2
+        lda     PIA0
+        coma
+        anda    #$40
+        rts
+
+* Waits until no key is down, and a little longer, so a key is taken once.
+* PA7 is the joystick comparator, not a key row, so it's left out.
+KEYUP   clr     PIA0+2          every column at once
+KEYUPLP lda     PIA0
+        ora     #$80
+        inca
+        bne     KEYUPLP
+        ldx     #$1000
+KEYUPW  leax    -1,x
+        bne     KEYUPW
+        clr     PIA0+2
+        lda     PIA0
+        ora     #$80
+        inca
+        bne     KEYUPLP
+        rts
+
+* Clears the menu's part of the screen: everything under the status line.
+CLRMENU ldx     #SCREEN+2*32
+        lda     #$60
+CLRMLP  sta     ,x+
+        cmpx    #SCREEN+512
+        bne     CLRMLP
+        rts
+
 * Clears the text screen to green spaces.
 CLS     ldx     #SCREEN
         lda     #$60
@@ -423,11 +500,11 @@ C6809   fcc     "6809"
         fcb     0
 C6309   fcc     "6309"
         fcb     0
-RULE    fcc     "PICK A ROM SET:"
-        fcb     0
 CARTMSG fcc     "CARTRIDGE IN SLOT - '-' ENTRIES"
         fcb     0
 PRESS   fcc     "PRESS A NUMBER TO BOOT"
+        fcb     0
+PRESSUB fcc     "PRESS A NUMBER, BREAK TO GO BACK"
         fcb     0
 
         include "menu.inc"

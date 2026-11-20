@@ -44,17 +44,22 @@ HDB-DOS. Three is the most a multi-ROM slot holds.
 
 ## Menu entries
 
-The list is fixed at compile time for now. It may become configurable at run
+`menu.json` sets the menu at build time. It may become configurable at run
 time later.
 
-| # | Entry | Notes |
+| Key | Entry | Notes |
 | --- | --- | --- |
-| 1 | Color BASIC + ECB + HDB-DOS (One ROM build) | The default. |
-| 2 | Color BASIC + ECB | No HDB-DOS. The DriveWire plugin ignores knocks, and One ROM doesn't answer CTS\*. |
-| 3 | CoCo 3 BASIC, CoCo 2 port | Coco 32, from the Color Computer Archive. Needs 64K, and its patch code fills the cartridge select. |
-| 4 | Entry 3 + HDB-DOS | Clashes with entry 3's patch code on the cartridge select. |
-| 5 | Diagnostics | varmfskii/cocodiag, a cartridge started at $C000, as One ROM can't autostart it. |
+| 1 | HDB-DOS (Becker, FujiNet) | toolshed's hdbdw3bck on CTS\*, with One ROM's Becker port bridged to the FujiNet. |
+| 2 | Color BASIC + Extended | |
+| 3 | Disk Extended BASIC 1.1 | On CTS\*. |
+| 4 | Advanced BASIC (Deluxe) | The Deluxe CoCo's BASIC, patched for the CoCo 2 by `~/deluxe-coco`. |
+| 5 | CoCo 3 BASIC (Coco 32) | Coco 32, from the Color Computer Archive. Needs 64K. |
 | 6 | Forth | hcgernhardtiii/coco-forth-rom, replacing Color BASIC. Built with asm6809. |
+| 7 | Diagnostics and tests > | A submenu: varmfskii/cocodiag, and this repository's Becker and FujiNet SSID link tests. |
+| 8 | Dragon > | A submenu: the Dragon 32's BASIC, patched by `patches/dragon32.asm` for the CoCo's keyboard wiring, and the same with DOSplus 5 and the DW42 extender on CTS\*, its Becker port at the Dragon's $FF49-$FF4A bridged to the FujiNet. |
+
+An entry can be a submenu, one level deep, marked `>` at the end of its row.
+Its entries are picked with keys 1-9 as at the top, and BREAK goes back.
 
 The menu shows its version at the top left, and a status line under it with
 the RAM size and whether the CPU is a 6809 or a 6309. An entry the machine
