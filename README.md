@@ -4,6 +4,19 @@ A boot menu for the Tandy Color Computer, served by a One ROM. At power-on the
 CoCo shows a menu, and the chosen ROM set is then served in place of the menu
 and cold-started.
 
+## Screenshots
+
+| | |
+| --- | --- |
+| ![The top menu](docs/screenshots/menu.png) | ![The Diagnostics and tests submenu](docs/screenshots/diagnostics-submenu.png) |
+| The menu. `>` marks a submenu. | A submenu. BREAK goes back. |
+| ![The Dragon submenu](docs/screenshots/dragon-submenu.png) | ![Dragon 32 BASIC on a CoCo 2](docs/screenshots/dragon32-basic.png) |
+| The Dragon submenu. | Dragon 32 BASIC on a CoCo 2, typed on the CoCo's keyboard. |
+
+Taken in XRoar, running this menu ROM and the patched Dragon 32 ROM on an
+emulated CoCo 2. XRoar's CoCo 2 gives the menu 32K, so CoCo 3 BASIC, which
+needs 64K, shows `-` in place of its number. A 64K CoCo shows its number.
+
 ## Targets
 
 1. **First:** CoCo 2 26-3134 and 26-3136. Color BASIC and Extended Color BASIC
